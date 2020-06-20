@@ -3,6 +3,8 @@ to communicate between the C++ and JavaScript worlds with Embind.
 
 ![Screenshot](screenshot.png)
 
+[See it in action.](https://pycage.github.io/shellfish/mandelbrot-wasm/www/index.html)
+
 # Setup
 
 * Install cmake.
