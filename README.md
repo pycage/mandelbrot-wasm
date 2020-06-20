@@ -11,9 +11,9 @@ to communicate between the C++ and JavaScript worlds with Embind.
 ```
 mandelbrot-wasm # mkdir build
 mandelbrot-wasm # cd build
-mandelbrot-wasm # emcmake cmake ..
-mandelbrot-wasm # make
-mandelbrot-wasm # emrun --port 8000 --no_browser .
+build # emcmake cmake ..
+build # make
+build # emrun --port 8000 --no_browser .
 ```
 * Point your browser to http://localhost:8000/www/index.html
 
