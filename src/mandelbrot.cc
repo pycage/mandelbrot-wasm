@@ -23,7 +23,7 @@ namespace
         for (size_t i = 0; i < in.size(); ++i)
         {
             imgBuffer[i * 4] = in[i];
-            imgBuffer[i * 4 + 1] = in[i] / 2;
+            imgBuffer[i * 4 + 1] = in[i] * 0.7;
             imgBuffer[i * 4 + 2] = 0;
             imgBuffer[i * 4 + 3] = 255;
         }
