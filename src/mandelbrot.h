@@ -30,7 +30,6 @@ public:
     void computeRegionAsync(int width, int height, Region region, double zoom, emscripten::val callback);
     void computeRegion(int width, int height, Region region, double zoom, emscripten::val callback);
     void checkResults();
-    void renderRegion(emscripten::val ctx, const std::vector<uint8_t>& data, Region region);
 
 private:
     void registerResult(std::future<std::vector<uint8_t>> future, emscripten::val callback);

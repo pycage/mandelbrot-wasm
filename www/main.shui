@@ -14,6 +14,7 @@ Document {
     property offsetX: 0.0
     property offsetY: 0.0
     property scale: 1.0
+    property lowRes: false
 
     property zoom: (factor, cx, cy, lowRes) =>
     {
@@ -31,7 +32,7 @@ Document {
         {
             lowResResetTimer.stop();
             lowResResetTimer.start();
-            cnv.lowRes = true;
+            doc.lowRes = true;
         }
         render();
     }
@@ -43,10 +44,12 @@ Document {
             return;
         }
 
-        const totalWidth = cnv.originalWidth;
-        const totalHeight = cnv.originalHeight;
+        const targetCnv = doc.lowRes ? lowResCnv : cnv;
 
-        const blockSize = Math.floor(cnv.originalWidth / (cnv.lowRes ? 1 : 3));
+        const totalWidth = targetCnv.originalWidth;
+        const totalHeight = targetCnv.originalHeight;
+
+        const blockSize = Math.floor(targetCnv.originalWidth / (doc.lowRes ? 1 : 3));
 
         // clear pending tasks
         mandelbrot.reset();
@@ -73,7 +76,7 @@ Document {
     {
         ++doc.pending;
 
-        const ctx = cnv.context2d;
+        const ctx = doc.lowRes ? lowResCnv.context2d : cnv.context2d;
         const imageData = ctx.createImageData(region.width, region.height);
         const buffer = imageData.data;
 
@@ -86,6 +89,9 @@ Document {
         });
     }
 
+    onBboxChanged: () => { render(); }
+
+
     // timer for disabling low-res mode after a while
     Timer {
         id: lowResResetTimer
@@ -94,7 +100,7 @@ Document {
         interval: 500
         repeat: false
 
-        onTimeout: () => { cnv.lowRes = false; }
+        onTimeout: () => { doc.lowRes = false; doc.render(); }
     }
 
     // Since the WASM is loaded externally (FIXME!), wait for it to become ready.
@@ -115,12 +121,13 @@ Document {
             }
         }
     }
-
+    
     MouseBox {
         fillWidth: true
         height: documentRoot.windowHeight
 
         color: "black"
+
 
         onDrag: (ev) =>
         {
@@ -132,9 +139,7 @@ Document {
                 const dx = ev.deltaX / w;
                 const dy = ev.deltaY / h;
 
-                cnv.lowRes = true;
-                lowResResetTimer.stop();
-                lowResResetTimer.start();
+                doc.lowRes = true;
 
                 // multiply by 2.0 because the range in view is of size 2+2i
                 doc.offsetX -= 2.0 * dx / doc.scale;
@@ -143,32 +148,46 @@ Document {
             }
         }
 
+        onDragEnd: () => { doc.lowRes = false; doc.render(); }
+
         onWheel: (ev) =>
         {
             ev.accepted = true;
             const px = ev.x / bbox.width;
             const py = ev.y / bbox.height;
-            console.log(px);
             doc.zoom(ev.deltaY < 0 ? 0.9 : 1.1, px, py, true);
         }
 
         onContextMenu: (ev) => { ev.accepted = true; }
 
-        Canvas {
-            id: cnv
-
-            property lowRes: false
-
+        Box {
             fillWidth: true
             fillHeight: true
-
             cursor: "move"
 
-            originalWidth: lowRes ? 100 : bbox.width
-            originalHeight: lowRes ? 100 : bbox.height
+            Canvas {
+                id: lowResCnv
 
-            onOriginalWidthChanged: () => { doc.render(); }
-            onOriginalHeightChanged: () => { doc.render(); }
+                position: "free"
+                fillWidth: true
+                fillHeight: true
+
+                originalWidth: 50
+                originalHeight: 50
+            }
+
+            Canvas {
+                id: cnv
+
+                visible: ! doc.lowRes
+                position: "free"
+
+                fillWidth: true
+                fillHeight: true
+
+                originalWidth: bbox.width
+                originalHeight: bbox.height
+            }
         }
 
         MouseBox {
