@@ -3,13 +3,38 @@ require "shellfish/ui";
 Document {
     id: doc
 
+    // our instance of the C++ Mandelbrot class
     property mandelbrot: null
+
     property ready: false
+
+    // keep track of the pending render tasks
     property pending: 0
 
     property offsetX: 0.0
     property offsetY: 0.0
     property scale: 1.0
+
+    property zoom: (factor, cx, cy, lowRes) =>
+    {
+        // zoom while keeping the view centered
+        const cx1 = cx * 2.0 / scale;
+        const cy1 = cy * 2.0 / scale;
+        scale *= factor;
+        const cx2 = cx * 2.0 / scale;
+        const cy2 = cy * 2.0 / scale;
+        const dx = cx2 - cx1;
+        const dy = cy2 - cy1;
+        offsetX -= dx;
+        offsetY -= dy;
+        if (lowRes)
+        {
+            lowResResetTimer.stop();
+            lowResResetTimer.start();
+            cnv.lowRes = true;
+        }
+        render();
+    }
 
     property render: () =>
     {
@@ -17,13 +42,17 @@ Document {
         {
             return;
         }
+
         const totalWidth = cnv.originalWidth;
         const totalHeight = cnv.originalHeight;
 
-        const blockSize = Math.floor(cnv.originalWidth / 3);
+        const blockSize = Math.floor(cnv.originalWidth / (cnv.lowRes ? 1 : 3));
 
+        // clear pending tasks
         mandelbrot.reset();
         pending = 0;
+
+        // divide the screen into regions to be computed in parallel
         for (let x = 0; x < totalWidth; x += blockSize)
         {
             for (let y = 0; y < totalHeight; y += blockSize)
@@ -55,11 +84,22 @@ Document {
             const imgData = new ImageData(new Uint8ClampedArray(data), region.width);
             ctx.putImageData(imgData, region.x, region.y);
         });
-
     }
 
+    // timer for disabling low-res mode after a while
     Timer {
-        interval: 100
+        id: lowResResetTimer
+
+        running: false
+        interval: 500
+        repeat: false
+
+        onTimeout: () => { cnv.lowRes = false; }
+    }
+
+    // Since the WASM is loaded externally (FIXME!), wait for it to become ready.
+    Timer {
+        interval: 500
         running: ! doc.mandelbrot
         repeat: ! doc.mandelbrot
 
@@ -68,6 +108,7 @@ Document {
             const mod = window.wasmRuntime;
             if (mod)
             {
+                // create an instance of the C++ Mandelbrot class
                 doc.mandelbrot = new mod.Mandelbrot();
                 doc.ready = true;
                 doc.render();
@@ -75,6 +116,124 @@ Document {
         }
     }
 
+    MouseBox {
+        fillWidth: true
+        height: documentRoot.windowHeight
+
+        color: "black"
+
+        onDrag: (ev) =>
+        {
+            ev.accepted = true;
+            if (Math.abs(ev.deltaX) > 4 || Math.abs(ev.deltaY) > 4)
+            {
+                const w = bbox.width;
+                const h = bbox.height;
+                const dx = ev.deltaX / w;
+                const dy = ev.deltaY / h;
+
+                cnv.lowRes = true;
+                lowResResetTimer.stop();
+                lowResResetTimer.start();
+
+                // multiply by 2.0 because the range in view is of size 2+2i
+                doc.offsetX -= 2.0 * dx / doc.scale;
+                doc.offsetY -= 2.0 * dy / doc.scale;
+                doc.render();
+            }
+        }
+
+        onWheel: (ev) =>
+        {
+            ev.accepted = true;
+            const px = ev.x / bbox.width;
+            const py = ev.y / bbox.height;
+            console.log(px);
+            doc.zoom(ev.deltaY < 0 ? 0.9 : 1.1, px, py, true);
+        }
+
+        onContextMenu: (ev) => { ev.accepted = true; }
+
+        Canvas {
+            id: cnv
+
+            property lowRes: false
+
+            fillWidth: true
+            fillHeight: true
+
+            cursor: "move"
+
+            originalWidth: lowRes ? 100 : bbox.width
+            originalHeight: lowRes ? 100 : bbox.height
+
+            onOriginalWidthChanged: () => { doc.render(); }
+            onOriginalHeightChanged: () => { doc.render(); }
+        }
+
+        MouseBox {
+            fillWidth: true
+            height: theme.itemHeightMedium
+            layout: "center-row"
+            color: theme.primaryBackgroundColor
+
+            onPointerDown: (ev) => { ev.accepted = true; }
+
+            Label {
+                marginLeft: theme.paddingSmall
+                fillWidth: true
+                text: "Zoom: " + Math.floor(doc.scale * 100) + " %, Pending tasks: " + doc.pending
+            }
+
+            Button {
+                icon: "zoom-in"
+                onClick: () =>
+                {
+                    doc.zoom(1.1, 0.5, 0.5, false);
+                }
+            }
+
+            Button {
+                marginLeft: theme.paddingSmall
+                icon: "zoom-out"
+                onClick: () =>
+                {
+                    doc.zoom(0.9, 0.5, 0.5, false);
+                }
+            }
+
+            Button {
+                marginLeft: theme.paddingSmall
+                text: "Reset View"
+                onClick: () =>
+                {
+                    doc.offsetX = 0.0;
+                    doc.offsetY = 0.0;
+                    doc.scale = 1.0;
+                    doc.render();
+                }
+            }
+
+            Button {
+                marginLeft: theme.paddingSmall
+                marginRight: theme.paddingSmall
+                text: "About"
+                onClick: () =>
+                {
+                    const dlg = doc.aboutT.create();
+                    dlg.init();
+                }
+            }
+        }
+
+        Placeholder {
+            visible: ! doc.ready
+            text: "Loading WebAssembly..."
+        }
+    }
+
+    // This timer provides some kind of mainloop for monitoring the thread pool.
+    // It only runs while there are tasks scheduled.
     Timer {
         interval: 0
         running: doc.pending > 0
@@ -87,88 +246,20 @@ Document {
         }
     }
 
-    MouseBox {
-        fillWidth: true
-        height: documentRoot.windowHeight
+    property aboutT: template Dialog {
+        id: dialog
 
-        onPointerDown: (ev) =>
-        {
-            // center image on pointer position
-            ev.accepted = true;
-            const px = 2 * ((ev.x - bbox.width / 2) / bbox.width) / doc.scale;
-            const py = 2 * ((ev.y - bbox.height / 2) / bbox.height) / doc.scale;
+        title: "About Mandelbrot-WASM"
 
-            doc.offsetX += px;
-            doc.offsetY += py;
-            doc.render();
-        }
-
-        onContextMenu: (ev) => { ev.accepted = true; }
-
-        Canvas {
-            id: cnv
-
-            fillWidth: true
-            fillHeight: true
-
-            originalWidth: bbox.width
-            originalHeight: bbox.height
-
-            onOriginalWidthChanged: () => { doc.render(); }
-        }
-
-        MouseBox {
-            position: "free"
-            origin: "top-right"
-            x: theme.paddingSmall
-            y: theme.paddingSmall
-            layout: "row"
-
-            onPointerDown: (ev) => { ev.accepted = true; }
-
-            Button {
-                icon: "zoom-in"
-                onClick: () =>
-                {
-                    doc.scale *= 1.1;
-                    doc.render();
-                }
-            }
-
-            Button {
-                marginLeft: theme.paddingSmall
-                icon: "zoom-out"
-                onClick: () =>
-                {
-                    doc.scale = Math.max(1.0, doc.scale * 0.9);
-                    doc.render();
-                }
-            }
-
-            Button {
-                marginLeft: theme.paddingSmall
-                text: "Reset"
-                onClick: () =>
-                {
-                    doc.offsetX = 0.0;
-                    doc.offsetY = 0.0;
-                    doc.scale = 1.0;
-                    doc.render();
-                }
-            }
+        into buttons Button {
+            text: "Close"
+            onClick: () => { dialog.discard(); }
         }
 
         Label {
-            position: "free"
-            x: theme.paddingSmall
-            y: theme.paddingSmall
-            color: "red"
-            text: "Zoom: " + Math.floor(doc.scale * 100) + " %, Pending tasks: " + doc.pending
-        }
-
-        Placeholder {
-            visible: ! doc.ready
-            text: "Loading Assembly..."
+            text: "Copyright [icon:copyright] 2020 Martin Grimme\n\n" +
+                  "An example of parallelized C++ WebAssembly.\n\n" +
+                  "https://github.com/pycage/mandelbrot-wasm"
         }
     }
 }

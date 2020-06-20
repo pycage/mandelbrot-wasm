@@ -15,6 +15,9 @@ namespace
         double imaginary = 0.0;
     };
 
+    /* Converts the Mandelbrot set vector to a RGBA JavaScript Uint8Array for
+     * rendering on a canvas.
+     */
     emscripten::val toImageBuffer(std::vector<uint8_t> in, std::vector<uint8_t>& imgBuffer)
     {
         for (size_t i = 0; i < in.size(); ++i)
@@ -30,6 +33,8 @@ namespace
         return emscripten::val::global("Uint8Array").new_(buffer, reinterpret_cast<uint32_t>(imgBuffer.data()), imgBuffer.size());
     }
 
+    /* Computes a region of the Mandelbrot set.
+     */
     std::vector<uint8_t> computeRegion(int ctx, int width, int height, Mandelbrot::Region region, double zoom)
     {
         Complex p;

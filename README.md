@@ -1,6 +1,8 @@
 This is an example project of how to use threads in C++ with WebAssembly and how
 to communicate between the C++ and JavaScript worlds with Embind.
 
+![Screenshot](screenshot.png)
+
 # Setup
 
 * Install cmake.
