@@ -1,0 +1,5 @@
+include_directories(.)
+add_definitions("-s USE_BOOST_HEADERS=1 -s USE_PTHREADS=1")
+add_executable(mandelbrot main.cc mandelbrot.cc)
+set_target_properties(mandelbrot PROPERTIES LINK_FLAGS "--bind -s USE_PTHREADS=1 -s NO_EXIT_RUNTIME=1 -s ALLOW_MEMORY_GROWTH=1")
+target_link_libraries(mandelbrot ${CMAKE_SOURCE_DIR}/boost-thread/libboost_thread.bc)
