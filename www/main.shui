@@ -91,6 +91,19 @@ Document {
 
     onBboxChanged: () => { render(); }
 
+    Wasm {
+        source: "../src/mandelbrot.wasm"
+
+        onInitialization: () => { load(); }
+
+        onReady: () =>
+        {
+            const m = instance;
+            doc.mandelbrot = new m.Mandelbrot();
+            doc.ready = true;
+            doc.render();
+        }
+    }
 
     // timer for disabling low-res mode after a while
     Timer {
@@ -102,26 +115,7 @@ Document {
 
         onTimeout: () => { doc.lowRes = false; doc.render(); }
     }
-
-    // Since the WASM is loaded externally (FIXME!), wait for it to become ready.
-    Timer {
-        interval: 500
-        running: ! doc.mandelbrot
-        repeat: ! doc.mandelbrot
-
-        onTimeout: () =>
-        {
-            const mod = window.wasmRuntime;
-            if (mod)
-            {
-                // create an instance of the C++ Mandelbrot class
-                doc.mandelbrot = new mod.Mandelbrot();
-                doc.ready = true;
-                doc.render();
-            }
-        }
-    }
-    
+   
     MouseBox {
         fillWidth: true
         height: documentRoot.windowHeight
