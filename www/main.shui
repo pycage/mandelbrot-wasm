@@ -98,8 +98,7 @@ Document {
 
         onReady: () =>
         {
-            const m = instance;
-            doc.mandelbrot = new m.Mandelbrot();
+            doc.mandelbrot = new instance.Mandelbrot();
             doc.ready = true;
             doc.render();
         }
@@ -166,8 +165,8 @@ Document {
                 fillWidth: true
                 fillHeight: true
 
-                originalWidth: 50
-                originalHeight: 50
+                originalWidth: 100
+                originalHeight: 100
             }
 
             Canvas {
@@ -234,7 +233,7 @@ Document {
                 onClick: () =>
                 {
                     const dlg = doc.aboutT.create();
-                    dlg.init();
+                    dlg.show();
                 }
             }
         }
@@ -250,8 +249,7 @@ Document {
     Timer {
         interval: 0
         running: doc.pending > 0
-        // TODO: fix Timer to stop repeating when 'running' goes false
-        repeat: doc.pending > 0
+        repeat: true
         
         onTimeout: () =>
         {
